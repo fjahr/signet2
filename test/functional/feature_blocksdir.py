@@ -21,7 +21,7 @@ class BlocksdirTest(BitcoinTestFramework):
         assert os.path.isdir(os.path.join(self.nodes[0].datadir, "regtest", "blocks"))
         assert not os.path.isdir(os.path.join(self.nodes[0].datadir, "blocks"))
         shutil.rmtree(self.nodes[0].datadir)
-        initialize_datadir(self.options.tmpdir, 0)
+        initialize_datadir(self.options.tmpdir, 0, self.net)
         self.log.info("Starting with nonexistent blocksdir ...")
         blocksdir_path = os.path.join(self.options.tmpdir, 'blocksdir')
         self.nodes[0].assert_start_raises_init_error(["-blocksdir=" + blocksdir_path], 'Error: Specified blocks directory "{}" does not exist.'.format(blocksdir_path))

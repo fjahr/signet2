@@ -91,6 +91,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
 
     def __init__(self):
         """Sets test framework defaults. Do not override this method. Instead, override the set_test_params() method"""
+        self.net = "regtest"
         self.setup_clean_chain = False
         self.nodes = []
         self.network_thread = None
@@ -289,14 +290,15 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                 assert_equal(chain_info["initialblockdownload"], False)
 
     def import_deterministic_coinbase_privkeys(self):
-        for n in self.nodes:
-            try:
-                n.getwalletinfo()
-            except JSONRPCException as e:
-                assert str(e).startswith('Method not found')
-                continue
+        if self.net == "regtest":
+            for n in self.nodes:
+                try:
+                    n.getwalletinfo()
+                except JSONRPCException as e:
+                    assert str(e).startswith('Method not found')
+                    continue
 
-            n.importprivkey(privkey=n.get_deterministic_priv_key().key, label='coinbase')
+                n.importprivkey(privkey=n.get_deterministic_priv_key().key, label='coinbase')
 
     def run_test(self):
         """Tests must override this method to define test logic"""
@@ -334,6 +336,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                 extra_args=extra_args[i],
                 use_cli=self.options.usecli,
                 start_perf=self.options.perf,
+                net=self.net,
             ))
 
     def start_node(self, i, *args, **kwargs):
@@ -481,6 +484,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                     bitcoin_cli=self.options.bitcoincli,
                     coverage_dir=None,
                     cwd=self.options.tmpdir,
+                    net=self.net,
                 ))
                 self.nodes[i].args = args
                 self.start_node(i)
@@ -489,18 +493,19 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             for node in self.nodes:
                 node.wait_for_rpc_connection()
 
-            # Create a 199-block-long chain; each of the 4 first nodes
-            # gets 25 mature blocks and 25 immature.
-            # The 4th node gets only 24 immature blocks so that the very last
-            # block in the cache does not age too much (have an old tip age).
-            # This is needed so that we are out of IBD when the test starts,
-            # see the tip age check in IsInitialBlockDownload().
-            for i in range(8):
-                self.nodes[0].generatetoaddress(25 if i != 7 else 24, self.nodes[i % 4].get_deterministic_priv_key().address)
-            sync_blocks(self.nodes)
+            if self.net == "regtest":
+                # Create a 199-block-long chain; each of the 4 first nodes
+                # gets 25 mature blocks and 25 immature.
+                # The 4th node gets only 24 immature blocks so that the very last
+                # block in the cache does not age too much (have an old tip age).
+                # This is needed so that we are out of IBD when the test starts,
+                # see the tip age check in IsInitialBlockDownload().
+                for i in range(8):
+                    self.nodes[0].generatetoaddress(25 if i != 7 else 24, self.nodes[i % 4].get_deterministic_priv_key().address)
+                sync_blocks(self.nodes)
 
-            for n in self.nodes:
-                assert_equal(n.getblockchaininfo()["blocks"], 199)
+                for n in self.nodes:
+                    assert_equal(n.getblockchaininfo()["blocks"], 199)
 
             # Shut them down, and clean up cache directories:
             self.stop_nodes()
@@ -519,7 +524,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             from_dir = get_datadir_path(self.options.cachedir, i)
             to_dir = get_datadir_path(self.options.tmpdir, i)
             shutil.copytree(from_dir, to_dir)
-            initialize_datadir(self.options.tmpdir, i)  # Overwrite port/rpcport in bitcoin.conf
+            initialize_datadir(self.options.tmpdir, i, self.net)  # Overwrite port/rpcport in bitcoin.conf
 
     def _initialize_chain_clean(self):
         """Initialize empty blockchain for use by the test.
@@ -527,7 +532,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         Create an empty blockchain and num_nodes wallets.
         Useful if a test case wants complete control over initialization."""
         for i in range(self.num_nodes):
-            initialize_datadir(self.options.tmpdir, i)
+            initialize_datadir(self.options.tmpdir, i, self.net)
 
     def skip_if_no_py3_zmq(self):
         """Attempt to import the zmq package and skip the test if the import fails."""

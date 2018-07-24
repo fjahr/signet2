@@ -20,6 +20,7 @@
 #include <rpc/server.h>
 #include <rpc/util.h>
 #include <shutdown.h>
+#include <signet.h>
 #include <txmempool.h>
 #include <util/strencodings.h>
 #include <util/system.h>
@@ -98,9 +99,26 @@ static UniValue getnetworkhashps(const JSONRPCRequest& request)
     return GetNetworkHashPS(!request.params[0].isNull() ? request.params[0].get_int() : 120, !request.params[1].isNull() ? request.params[1].get_int() : -1);
 }
 
+static bool grindBlock(CBlock* pblock, uint64_t& nMaxTries, uint256& result)
+{
+    while (nMaxTries > 0 && pblock->nNonce < std::numeric_limits<uint32_t>::max() && !CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus()) && !ShutdownRequested()) {
+        ++pblock->nNonce;
+        --nMaxTries;
+    }
+    if (ShutdownRequested()) {
+        return false;
+    }
+    if (!CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus())) return false;
+    std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(*pblock);
+    if (!ProcessNewBlock(Params(), shared_pblock, true, nullptr)) {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
+    }
+    result = pblock->GetHash();
+    return true;
+}
+
 UniValue generateBlocks(std::shared_ptr<CReserveScript> coinbaseScript, int nGenerate, uint64_t nMaxTries, bool keepScript)
 {
-    static const int nInnerLoopCount = 0x10000;
     int nHeightEnd = 0;
     int nHeight = 0;
 
@@ -110,6 +128,7 @@ UniValue generateBlocks(std::shared_ptr<CReserveScript> coinbaseScript, int nGen
         nHeightEnd = nHeight+nGenerate;
     }
     unsigned int nExtraNonce = 0;
+    uint256 result;
     UniValue blockHashes(UniValue::VARR);
     while (nHeight < nHeightEnd && !ShutdownRequested())
     {
@@ -121,21 +140,12 @@ UniValue generateBlocks(std::shared_ptr<CReserveScript> coinbaseScript, int nGen
             LOCK(cs_main);
             IncrementExtraNonce(pblock, chainActive.Tip(), nExtraNonce);
         }
-        while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount && !CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus())) {
-            ++pblock->nNonce;
-            --nMaxTries;
-        }
-        if (nMaxTries == 0) {
-            break;
-        }
-        if (pblock->nNonce == nInnerLoopCount) {
+        if (!grindBlock(&pblocktemplate->block, nMaxTries, result)) {
+            if (nMaxTries == 0) break;
             continue;
         }
-        std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(*pblock);
-        if (!ProcessNewBlock(Params(), shared_pblock, true, nullptr))
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
         ++nHeight;
-        blockHashes.push_back(pblock->GetHash().GetHex());
+        blockHashes.push_back(result.GetHex());
 
         //mark script as important because it was used at least for one coinbase output if the script came from the wallet
         if (keepScript)
@@ -177,6 +187,10 @@ static UniValue generatetoaddress(const JSONRPCRequest& request)
     CTxDestination destination = DecodeDestination(request.params[1].get_str());
     if (!IsValidDestination(destination)) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Error: Invalid address");
+    }
+
+    if (g_signet_blocks) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Generating signet blocks require that you use getnewblockhex");
     }
 
     std::shared_ptr<CReserveScript> coinbaseScript = std::make_shared<CReserveScript>();
@@ -418,7 +432,7 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
             if (block.hashPrevBlock != pindexPrev->GetBlockHash())
                 return "inconclusive-not-best-prevblk";
             CValidationState state;
-            TestBlockValidity(state, Params(), block, pindexPrev, false, true);
+            TestBlockValidity(state, Params(), block, false, true);
             return BIP22ValidationResult(state);
         }
 
@@ -972,6 +986,99 @@ static UniValue estimaterawfee(const JSONRPCRequest& request)
     return result;
 }
 
+//
+// signet
+//
+
+UniValue getnewblockhex(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 1) {
+        throw std::runtime_error(
+            RPCHelpMan{"getnewblockhex",
+                "\nGets hex representation of a proposed, unmined new signet block.\n",
+                {
+                    {"coinbase_destination", RPCArg::Type::STR, RPCArg::Optional::NO, "Pay-out destination, as an address or a custom coinbase script"},
+                },
+                RPCResult{
+                    "blockhex      (hex) The block hex\n"
+                },
+                RPCExamples{
+                    HelpExampleCli("getnewblockhex", "bc1qkallealmkdwwyuc2tmf5c6hzmlaujq6jl38hpe")
+                }
+            }.ToString());
+    }
+
+    if (!g_signet_blocks) {
+        throw std::runtime_error("getnewblockhex can only be used with signet networks");
+    }
+
+    CScript coinbase_script;
+    auto str = request.params[0].get_str();
+    if (IsValidDestinationString(str)) {
+        auto dest = DecodeDestination(str);
+        coinbase_script = GetScriptForDestination(dest);
+    } else {
+        util::insert(coinbase_script, ParseHexV(str, "coinbase_script"));
+    }
+
+    auto block = BlockAssembler(Params()).CreateNewBlock(coinbase_script)->block;
+    unsigned int extra_nonce = 0;
+    // we bump stuff to bop stuff, or merkle root will be 0, etc etc etc etc
+    {
+        LOCK(cs_main);
+        IncrementExtraNonce(&block, chainActive.Tip(), extra_nonce);
+    }
+
+    CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
+    ssBlock << block;
+
+    return HexStr(ssBlock.begin(), ssBlock.end());
+}
+
+static UniValue grindblock(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 2)
+        throw std::runtime_error(
+            RPCHelpMan{"grindblock",
+                "\nGrind the given signet block to find valid proof of work\n"
+                "May fail if it reaches maxtries attempts.\n",
+                {
+                    {"blockhex", RPCArg::Type::STR, RPCArg::Optional::NO, "The block data"},
+                    {"maxtries", RPCArg::Type::NUM, /* default */ "1000000", "How many iterations to try."},
+                },
+                RPCResult{
+                    "blockhash     (hex) resulting block hash, or null if none was found\n"
+                },
+                RPCExamples{
+                    "\nGrind a block with hex $blockhex\n"
+                    + HelpExampleCli("grindblock", "$blockhex")
+                },
+            }.ToString());
+
+    if (!g_signet_blocks) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Grinding blocks is only possible in a signet network");
+    }
+
+    CBlock block;
+    auto blockhex = ParseHexV(request.params[0], "blockhex");
+    CDataStream ssBlock(blockhex, SER_NETWORK, PROTOCOL_VERSION);
+    ssBlock >> block;
+
+    std::vector<uint8_t> signet_commitment;
+    if (!block.GetWitnessCommitmentSection(SIGNET_HEADER, signet_commitment)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Block has no signet commitment; please sign it first");
+    }
+
+    uint64_t max_tries = request.params[1].isNull() ? 1000000 : request.params[1].get_int();
+    uint256 result;
+    while (max_tries > 0 && !ShutdownRequested()) {
+        if (grindBlock(&block, max_tries, result)) return result.GetHex();
+        if (max_tries == 0) break;
+    }
+
+    return false;
+}
+
 // clang-format off
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         argNames
@@ -989,6 +1096,10 @@ static const CRPCCommand commands[] =
     { "util",               "estimatesmartfee",       &estimatesmartfee,       {"conf_target", "estimate_mode"} },
 
     { "hidden",             "estimaterawfee",         &estimaterawfee,         {"conf_target", "threshold"} },
+
+    /** Signet mining */
+    { "signet",             "getnewblockhex",         &getnewblockhex,         {"coinbase_destination"} },
+    { "signet",             "grindblock",             &grindblock,             {"blockhex", "maxtries"} },
 };
 // clang-format on
 
