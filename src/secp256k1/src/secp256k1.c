@@ -56,14 +56,6 @@ struct secp256k1_context_struct {
     secp256k1_callback error_callback;
 };
 
-static const secp256k1_context secp256k1_context_no_precomp_ = {
-    { 0 },
-    { 0 },
-    { default_illegal_callback_fn, 0 },
-    { default_error_callback_fn, 0 }
-};
-const secp256k1_context *secp256k1_context_no_precomp = &secp256k1_context_no_precomp_;
-
 secp256k1_context* secp256k1_context_create(unsigned int flags) {
     secp256k1_context* ret = (secp256k1_context*)checked_malloc(&default_error_callback, sizeof(secp256k1_context));
     ret->illegal_callback = default_illegal_callback;
@@ -99,7 +91,6 @@ secp256k1_context* secp256k1_context_clone(const secp256k1_context* ctx) {
 }
 
 void secp256k1_context_destroy(secp256k1_context* ctx) {
-    CHECK(ctx != secp256k1_context_no_precomp);
     if (ctx != NULL) {
         secp256k1_ecmult_context_clear(&ctx->ecmult_ctx);
         secp256k1_ecmult_gen_context_clear(&ctx->ecmult_gen_ctx);
@@ -109,7 +100,6 @@ void secp256k1_context_destroy(secp256k1_context* ctx) {
 }
 
 void secp256k1_context_set_illegal_callback(secp256k1_context* ctx, void (*fun)(const char* message, void* data), const void* data) {
-    CHECK(ctx != secp256k1_context_no_precomp);
     if (fun == NULL) {
         fun = default_illegal_callback_fn;
     }
@@ -118,7 +108,6 @@ void secp256k1_context_set_illegal_callback(secp256k1_context* ctx, void (*fun)(
 }
 
 void secp256k1_context_set_error_callback(secp256k1_context* ctx, void (*fun)(const char* message, void* data), const void* data) {
-    CHECK(ctx != secp256k1_context_no_precomp);
     if (fun == NULL) {
         fun = default_error_callback_fn;
     }
@@ -333,6 +322,29 @@ static SECP256K1_INLINE void buffer_append(unsigned char *buf, unsigned int *off
     *offset += len;
 }
 
+/* This nonce function is described in BIP-schnorr
+ * (https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki) */
+static int nonce_function_bipschnorr(unsigned char *nonce32, const unsigned char *msg32, const unsigned char *key32, const unsigned char *algo16, void *data, unsigned int counter) {
+    secp256k1_sha256 sha;
+    (void) counter;
+    VERIFY_CHECK(counter == 0);
+
+    /* Hash x||msg as per the spec */
+    secp256k1_sha256_initialize(&sha);
+    secp256k1_sha256_write(&sha, key32, 32);
+    secp256k1_sha256_write(&sha, msg32, 32);
+    /* Hash in algorithm, which is not in the spec, but may be critical to
+     * users depending on it to avoid nonce reuse across algorithms. */
+    if (algo16 != NULL) {
+        secp256k1_sha256_write(&sha, algo16, 16);
+    }
+    if (data != NULL) {
+        secp256k1_sha256_write(&sha, data, 32);
+    }
+    secp256k1_sha256_finalize(&sha, nonce32);
+    return 1;
+}
+
 static int nonce_function_rfc6979(unsigned char *nonce32, const unsigned char *msg32, const unsigned char *key32, const unsigned char *algo16, void *data, unsigned int counter) {
    unsigned char keydata[112];
    unsigned int offset = 0;
@@ -363,6 +375,7 @@ static int nonce_function_rfc6979(unsigned char *nonce32, const unsigned char *m
    return 1;
 }
 
+const secp256k1_nonce_function secp256k1_nonce_function_bipschnorr = nonce_function_bipschnorr;
 const secp256k1_nonce_function secp256k1_nonce_function_rfc6979 = nonce_function_rfc6979;
 const secp256k1_nonce_function secp256k1_nonce_function_default = nonce_function_rfc6979;
 
@@ -570,9 +583,8 @@ int secp256k1_ec_pubkey_tweak_mul(const secp256k1_context* ctx, secp256k1_pubkey
 
 int secp256k1_context_randomize(secp256k1_context* ctx, const unsigned char *seed32) {
     VERIFY_CHECK(ctx != NULL);
-    if (secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx)) {
-        secp256k1_ecmult_gen_blind(&ctx->ecmult_gen_ctx, seed32);
-    }
+    ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
+    secp256k1_ecmult_gen_blind(&ctx->ecmult_gen_ctx, seed32);
     return 1;
 }
 
@@ -602,6 +614,10 @@ int secp256k1_ec_pubkey_combine(const secp256k1_context* ctx, secp256k1_pubkey *
 
 #ifdef ENABLE_MODULE_ECDH
 # include "modules/ecdh/main_impl.h"
+#endif
+
+#ifdef ENABLE_MODULE_SCHNORRSIG
+# include "modules/schnorrsig/main_impl.h"
 #endif
 
 #ifdef ENABLE_MODULE_RECOVERY
