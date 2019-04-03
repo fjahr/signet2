@@ -174,6 +174,11 @@ public:
     virtual ~BaseSignatureChecker() {}
 };
 
+enum class SignatureType {
+    ECDSA,
+    SCHNORR
+};
+
 class SimpleSignatureChecker : public BaseSignatureChecker
 {
 private:
@@ -182,7 +187,7 @@ private:
 public:
     const uint256& GetHash() const { return hash; }
     SimpleSignatureChecker(const uint256& hash_in) : hash(hash_in) {}
-    bool CheckSig(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion) const override;
+    bool CheckSig(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const ScriptExecutionData& execdata, SigVersion sigversion) const override;
 };
 
 template <class T>
@@ -195,7 +200,7 @@ private:
     const PrecomputedTransactionData* txdata;
 
 protected:
-    virtual bool VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& vchPubKey, const uint256& sighash) const;
+    virtual bool VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& vchPubKey, const uint256& sighash, SignatureType sigtype) const;
 
 public:
     GenericTransactionSignatureChecker(const T* txToIn, unsigned int nInIn, const CAmount& amountIn) : txTo(txToIn), nIn(nInIn), amount(amountIn), txdata(nullptr) {}
