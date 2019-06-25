@@ -182,7 +182,7 @@ def test_dust_to_fee(rbf_node, dest_address):
     # (32-byte p2sh-pwpkh output size + 148 p2pkh spend estimate) * 10k(discard_rate) / 1000 = 1800
     # P2SH outputs are slightly "over-discarding" due to the IsDust calculation assuming it will
     # be spent as a P2PKH.
-    bumped_tx = rbf_node.bumpfee(rbfid, {"totalFee": 50000 - 1800})
+    bumped_tx = rbf_node.bumpfee(rbfid, {"totalFee": 50000 - 800})
     full_bumped_tx = rbf_node.getrawtransaction(bumped_tx["txid"], 1)
     assert_equal(bumped_tx["fee"], Decimal("0.00050000"))
     assert_equal(len(fulltx["vout"]), 2)
