@@ -4,6 +4,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-export LC_ALL=C
+# export LC_ALL=C
 
-git fetch --unshallow
+# git fetch --unshallow
