@@ -283,18 +283,29 @@ public:
 class SigNetParams : public CChainParams {
 public:
     SigNetParams(const ArgsManager& args) {
-        if (!args.IsArgSet("-signet_blockscript")) {
-            throw std::runtime_error(strprintf("%s: -signet_blockscript is mandatory for signet networks", __func__));
-        }
-        if (args.GetArgs("-signet_blockscript").size() != 1) {
-            throw std::runtime_error(strprintf("%s: -signet_blockscript cannot be multiple values.", __func__));
-        }
+        std::vector<uint8_t> bin;
+        if (!args.IsArgSet("-signet_blockscript") && !args.IsArgSet("-signet_seednode")) {
+            LogPrintf("Using default signet network\n");
+            bin = ParseHex("512103ad5e0edad18cb1f0fc0d28a3d4f1f3e445640337489abb10404f2d1e086be43051ae");
+            vSeeds.clear();
+            vSeeds.push_back("178.128.221.177");
+        } else {
+            if (!args.IsArgSet("-signet_blockscript")) {
+                throw std::runtime_error(strprintf("%s: -signet_blockscript is mandatory for signet networks", __func__));
+            }
+            if (args.GetArgs("-signet_blockscript").size() != 1) {
+                throw std::runtime_error(strprintf("%s: -signet_blockscript cannot be multiple values.", __func__));
+            }
+            bin = ParseHex(args.GetArgs("-signet_blockscript")[0]);
+            if (args.IsArgSet("-signet_seednode")) {
+                vSeeds = gArgs.GetArgs("-signet_seednode");
+            }
 
-        LogPrintf("SigNet with block script %s\n", gArgs.GetArgs("-signet_blockscript")[0]);
+            LogPrintf("SigNet with block script %s\n", gArgs.GetArgs("-signet_blockscript")[0]);
+        }
 
         strNetworkID = "signet";
         g_signet_blocks = true;
-        auto bin = ParseHex(args.GetArgs("-signet_blockscript")[0]);
         g_signet_blockscript = CScript(bin.begin(), bin.end());
         consensus.nSubsidyHalvingInterval = 210000;
         consensus.BIP34Height = 1;
@@ -337,10 +348,6 @@ public:
         consensus.hashGenesisBlock = genesis.GetHash();
 
         vFixedSeeds.clear();
-        vSeeds.clear();
-        if (args.IsArgSet("-signet_seednode")) {
-            vSeeds = gArgs.GetArgs("-signet_seednode");
-        }
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>{125};
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>{87};
