@@ -290,6 +290,7 @@ public:
             vSeeds.clear();
             vSeeds.push_back("178.128.221.177");
             vSeeds.push_back("88.208.3.158");
+            vSeeds.push_back("167.99.95.228");
         } else {
             if (!args.IsArgSet("-signet_blockscript")) {
                 throw std::runtime_error(strprintf("%s: -signet_blockscript is mandatory for signet networks", __func__));
