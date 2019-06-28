@@ -289,6 +289,7 @@ public:
             bin = ParseHex("512103ad5e0edad18cb1f0fc0d28a3d4f1f3e445640337489abb10404f2d1e086be43051ae");
             vSeeds.clear();
             vSeeds.push_back("178.128.221.177");
+            vSeeds.push_back("88.208.3.158");
         } else {
             if (!args.IsArgSet("-signet_blockscript")) {
                 throw std::runtime_error(strprintf("%s: -signet_blockscript is mandatory for signet networks", __func__));
