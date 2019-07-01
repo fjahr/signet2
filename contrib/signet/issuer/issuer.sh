@@ -50,15 +50,16 @@ while true; do
     log "generating next block"
     # get address for coinbase output
     addr=$($bcli "$@" getnewaddress)
-    # create an unsigned, un-PoW'd block
-    unsigned=$($bcli "$@" getnewblockhex $addr)
-    # sign it
-    signed=$($bcli "$@" signblock $unsigned)
-    # grind proof of work; this ends up broadcasting the block, if successful (akin to "generatetoaddress")
+    # start looping; we re-create the block every time we fail to grind as that resets the nonce and gives us an updated
+    # version of the block
     while true; do
-        blockhash=$($bcli "$@" grindblock $signed 100000000)
-        if [ "$blockhash" = "false" ]; then continue; fi
-        break;
+        # create an unsigned, un-PoW'd block
+        unsigned=$($bcli "$@" getnewblockhex $addr)
+        # sign it
+        signed=$($bcli "$@" signblock $unsigned)
+        # grind proof of work; this ends up broadcasting the block, if successful (akin to "generatetoaddress")
+        blockhash=$($bcli "$@" grindblock $signed 10000000)
+        if [ "$blockhash" != "false" ]; then break; fi
     done
     if [ $? -ne 0 ]; then echo "node error; aborting" ; exit 1; fi
     log "mined block $($bcli "$@" getblockcount) $blockhash to $($bcli "$@" getconnectioncount) peer(s); idling for $idletime seconds"
