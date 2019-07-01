@@ -69,7 +69,7 @@ while true; do
             remtime=$triggertime
             blocks=$new_blocks
         else
-            let remtime=remtime-waittime
+            (( remtime=remtime-waittime ))
             if [ $remtime -lt 1 ]; then break; fi
         fi
     done
