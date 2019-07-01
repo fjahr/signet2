@@ -57,9 +57,11 @@ while true; do
     log "last block #$blocks; waiting up to $triggertime seconds for a new block"
     remtime=$triggertime
     while true; do
-        waittime=3600
+        waittime=1800
         if [ $waittime -gt $remtime ]; then waittime=$remtime; fi
-        log "waiting $waittime/$remtime seconds"
+        conns=$($bcli "$@" getconnectioncount)
+        if [ $conns -eq 1 ]; then s=""; else s="s"; fi
+        log "waiting $waittime/$remtime seconds with $conns peer$s"
         sleep $waittime
         new_blocks=$($bcli "$@" getblockcount)
         if [ $new_blocks -gt $blocks ]; then
