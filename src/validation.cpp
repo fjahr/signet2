@@ -3602,9 +3602,6 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
 {
     AssertLockHeld(cs_main);
     CBlockIndex* pindexPrev = chainActive.Tip();
-    if (pindexPrev->phashBlock && block.hashPrevBlock != *pindexPrev->phashBlock) {
-        return error("%s: hashPrevBlock of new block is not equal to current chain tip: %s != %s", __func__, block.hashPrevBlock.ToString(), pindexPrev->phashBlock->ToString());
-    }
     CCoinsViewCache viewNew(pcoinsTip.get());
     uint256 block_hash(block.GetHash());
     CBlockIndex indexDummy(block);
