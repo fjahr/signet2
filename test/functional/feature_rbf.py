@@ -73,9 +73,11 @@ class ReplaceByFeeTest(BitcoinTestFramework):
                 "-limitancestorsize=101",
                 "-limitdescendantcount=200",
                 "-limitdescendantsize=101",
+                "-addresstype=p2sh-segwit",
             ],
             [
                 "-mempoolreplacement=0",
+                "-addresstype=p2sh-segwit",
             ],
         ]
 
