@@ -54,11 +54,11 @@ while true; do
     # version of the block
     while true; do
         # create an unsigned, un-PoW'd block
-        unsigned=$($bcli "$@" getnewblockhex $addr)
+        $bcli "$@" getnewblockhex $addr > $PWD/unsigned
         # sign it
-        signed=$($bcli "$@" signblock $unsigned)
+        $bcli "$@" signblock $PWD/unsigned > $PWD/signed
         # grind proof of work; this ends up broadcasting the block, if successful (akin to "generatetoaddress")
-        blockhash=$($bcli "$@" grindblock $signed 10000000)
+        blockhash=$($bcli "$@" grindblock $PWD/signed 10000000)
         if [ "$blockhash" != "false" ]; then break; fi
     done
     if [ $? -ne 0 ]; then echo "node error; aborting" ; exit 1; fi

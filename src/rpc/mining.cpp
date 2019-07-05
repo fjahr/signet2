@@ -1060,9 +1060,22 @@ static UniValue grindblock(const JSONRPCRequest& request)
     }
 
     CBlock block;
-    auto blockhex = ParseHexV(request.params[0], "blockhex");
-    CDataStream ssBlock(blockhex, SER_NETWORK, PROTOCOL_VERSION);
-    ssBlock >> block;
+    if (!DecodeHexBlk(block, request.params[0].get_str())) {
+        FILE* fp = fopen(request.params[0].get_str().c_str(), "rb");
+        if (fp) {
+            std::string block_str;
+            char buf[1025];
+            size_t r;
+            buf[1024] = 0;
+            while (0 < (r = fread(buf, 1, 1024, fp))) { buf[r] = 0; block_str += buf; }
+            while (block_str.size() > 0 && block_str[block_str.size() - 1] == '\n') block_str = block_str.substr(0, block_str.size() - 1);
+            if (!DecodeHexBlk(block, block_str)) {
+                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode (from file) failed");
+            }
+        } else {
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
+        }
+    }
 
     std::vector<uint8_t> signet_commitment;
     if (!block.GetWitnessCommitmentSection(SIGNET_HEADER, signet_commitment)) {
