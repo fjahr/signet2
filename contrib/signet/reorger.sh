@@ -57,7 +57,7 @@ fi
 log "node OK with $conns connection(s)"
 
 currheight=$($bcli "$@" getblockcount)
-let nextheight=currheight+waitlen
+(( nextheight=currheight+waitlen ))
 log "current chain height = $currheight, waiting for height = $nextheight before mining alternative chain"
 log "once alternative chain hit, will mine at maximum capacity with $idletime second delay between each block until $chainlen blocks have been mined"
 log "hit ^C to stop"
@@ -70,7 +70,7 @@ while true; do
     done
     log "height -> $currheight >= $nextheight"
     # mine
-    let stopheight=currheight+chainlen
+    (( stopheight=currheight+chainlen ))
     while [ $stopheight -gt $currheight ]; do
         sleep $idletime
         blockhash=$(./mkblock.sh "$bcli" "$@")
@@ -78,6 +78,6 @@ while true; do
         currheight=$($bcli "$@" getblockcount)
         echo "- $blockhash -> $currheight / $stopheight"
     done
-    let nextheight=currheight+waitlen
+    (( nextheight=currheight+waitlen ))
     echo "waiting for height=$nextheight"
 done
