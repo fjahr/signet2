@@ -3485,6 +3485,7 @@ UniValue signblock(const JSONRPCRequest& request)
             buf[1024] = 0;
             while (0 < (r = fread(buf, 1, 1024, fp))) { buf[r] = 0; block_str += buf; }
             while (block_str.size() > 0 && block_str[block_str.size() - 1] == '\n') block_str = block_str.substr(0, block_str.size() - 1);
+            fclose(fp);
             if (!DecodeHexBlk(block, block_str)) {
                 throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode (from file) failed");
             }
