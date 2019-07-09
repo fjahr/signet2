@@ -37,18 +37,12 @@ bcli=$1
 shift
 
 if ! [ -e "$bcli" ]; then
-    which "$bcli" &> /dev/null
-    if [ $? -ne 0 ]; then
-        echo "error: unable to find bitcoin binary: $bcli" ; exit 1
-    fi
+    command -v "$bcli" >/dev/null 2>&1 || { echo >&2 "error: unable to find bitcoin binary: $bcli"; exit 1; }
 fi
 
 echo "- checking node status"
-conns=$($bcli "$@" getconnectioncount)
 
-if [ $? -ne 0 ]; then
-    echo "node error" ; exit 1
-fi
+conns=$($bcli "$@" getconnectioncount) || { echo >&2 "node error"; exit 1; }
 
 if [ $conns -lt 1 ]; then
     echo "warning: node is not connected to any other node"
@@ -73,8 +67,7 @@ while true; do
     (( stopheight=currheight+chainlen ))
     while [ $stopheight -gt $currheight ]; do
         sleep $idletime
-        blockhash=$(./mkblock.sh "$bcli" "$@")
-        if [ $? -ne 0 ]; then echo "node error; aborting"; exit 1; fi
+        blockhash=$(./mkblock.sh "$bcli" "$@") || { echo "node error; aborting"; exit 1; }
         currheight=$($bcli "$@" getblockcount)
         echo "- $blockhash -> $currheight / $stopheight"
     done

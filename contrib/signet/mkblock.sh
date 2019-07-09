@@ -17,10 +17,7 @@ bcli=$1
 shift
 
 if ! [ -e "$bcli" ]; then
-    which "$bcli" &> /dev/null
-    if [ $? -ne 0 ]; then
-        >&2 echo "error: unable to find bitcoin binary: $bcli" ; exit 1
-    fi
+    command -v "$bcli" >/dev/null 2>&1 || { echo >&2 "error: unable to find bitcoin binary: $bcli"; exit 1; }
 fi
 
 # get address for coinbase output
