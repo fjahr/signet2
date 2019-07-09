@@ -349,6 +349,17 @@ public:
         genesis = CreateGenesisBlock(coinbase_sig, genesis_out, 1534313275, 0, 0x1e2adc28, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
 
+        // Now that genesis block has been generated, we check if there is an enforcescript, and switch
+        // to that one, as we will not be using the real block script anymore
+        if (args.IsArgSet("-signet_enforcescript")) {
+            if (args.GetArgs("-signet_enforcescript").size() != 1) {
+                throw std::runtime_error(strprintf("%s: -signet_enforcescript cannot be multiple values.", __func__));
+            }
+            bin = ParseHex(args.GetArgs("-signet_enforcescript")[0]);
+            g_signet_blockscript = CScript(bin.begin(), bin.end());
+            LogPrintf("SigNet enforce script %s\n", gArgs.GetArgs("-signet_enforcescript")[0]);
+        }
+
         vFixedSeeds.clear();
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>{125};
