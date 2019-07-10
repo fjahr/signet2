@@ -11,7 +11,7 @@ export LC_ALL=C
 # is generated from an external source (i.e. the primary issuer is back online)
 #
 
-if [ $# -lt 4 ]; then
+if [ $# -lt 3 ]; then
     echo "syntax: $0 <trigger time> <idle time> <bitcoin-cli path> [<bitcoin-cli args>]" ; exit 1
 fi
 

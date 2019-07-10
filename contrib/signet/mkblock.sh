@@ -9,7 +9,7 @@ export LC_ALL=C
 # Generate a block
 #
 
-if [ $# -lt 2 ]; then
+if [ $# -lt 1 ]; then
     >&2 echo "syntax: $0 <bitcoin-cli path> [<bitcoin-cli args>]" ; exit 1
 fi
 

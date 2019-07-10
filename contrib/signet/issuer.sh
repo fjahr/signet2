@@ -9,7 +9,7 @@ export LC_ALL=C
 # Issue blocks using a local node at a given interval.
 #
 
-if [ $# -lt 3 ]; then
+if [ $# -lt 2 ]; then
     echo "syntax: $0 <idle time> <bitcoin-cli path> [<bitcoin-cli args>]" ; exit 1
 fi
 

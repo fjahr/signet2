@@ -10,7 +10,7 @@ export LC_ALL=C
 # are eventually reorged out of existence.
 #
 
-if [ $# -lt 5 ]; then
+if [ $# -lt 4 ]; then
     echo "syntax: $0 <idle-time> <chain-length> <wait-length> <bitcoin-cli path> [<bitcoin-cli args>]"
     echo "  <idle-time> refers to the number of seconds to wait between generating each block"
     echo "  <chain-length> refers to the number of blocks to generate in the to-be-orphaned chain"
