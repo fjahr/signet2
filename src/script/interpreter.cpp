@@ -1162,7 +1162,9 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
     if (!vfExec.empty())
         return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
 
-    if (v0_anyprevout && !v0_fixedprevout && !v2_fixedprevout) return set_error(serror, SCRIPT_ERR_TAPSCRIPT_NO_CHAPERONE);
+    // Don't set error on missing chaperone signature
+    // TODO: Reenable when chaperone signatures defined enough
+    // if (v0_anyprevout && !v0_fixedprevout && !v2_fixedprevout) return set_error(serror, SCRIPT_ERR_TAPSCRIPT_NO_CHAPERONE);
 
     /*
      *  We use different variables to follow the passing of ANYPREVOUT and fixed prevout signatures of different public key
